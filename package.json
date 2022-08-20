@@ -10,9 +10,9 @@
   },
   "samples": [
     {
-      "displayName": "Basic Setup",
-      "description": "Contains a scene showing the basic setup for the Ligthing 2D framework.",
-      "path": "Samples~/Basic Setup"
+      "displayName": "Demo",
+      "description": "Contains a demo scene showing of the Ligthing 2D framework.",
+      "path": "Samples~/Demo"
     }
   ]
 }
