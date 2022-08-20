@@ -46,10 +46,10 @@ namespace Tuntenfisch.Lighting2D
             CoreUtils.Destroy(m_renderShadowMapMaterial);
             CoreUtils.Destroy(m_shadowMapMesh);
 
-            m_shadowCasterTextureHandle.Release();
-            m_shadowCasterDistanceTextureHandle.Release();
-            m_warpedShadowCasterDistanceTextureHandle.Release();
-            m_shadowMapTextureHandle.Release();
+            m_shadowCasterTextureHandle?.Release();
+            m_shadowCasterDistanceTextureHandle?.Release();
+            m_warpedShadowCasterDistanceTextureHandle?.Release();
+            m_shadowMapTextureHandle?.Release();
         }
 
         public override void OnCameraSetup(CommandBuffer commandBuffer, ref RenderingData renderingData)

@@ -7,12 +7,5 @@
   "author": {
     "name": "Tuntenfisch",
     "url": "https://github.com/Tuntenfisch/"
-  },
-  "samples": [
-    {
-      "displayName": "Demo",
-      "description": "Contains a demo scene showing of the Ligthing 2D framework.",
-      "path": "Samples~/Demo"
-    }
-  ]
+  }
 }
