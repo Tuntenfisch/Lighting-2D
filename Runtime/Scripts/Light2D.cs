@@ -28,11 +28,16 @@ namespace Tuntenfisch.Lighting2D
         private EntityProperties m_properties;
         #endregion
 
-        #region Private Fields
-        private MaterialPropertyBlock m_materialPropertyBlock;
-        #endregion
-
         #region Unity Events
+        private void Start()
+        {
+            m_properties.SetMaterialPropertiesAction = (materialProperties) =>
+            {
+                materialProperties.SetFloat("_LightFalloff", m_falloff);
+                materialProperties.SetColor("_LightColor", m_color);
+            };
+        }
+
         private void OnEnable()
         {
             EntityManager.Add(this);
@@ -42,17 +47,13 @@ namespace Tuntenfisch.Lighting2D
         {
             EntityManager.Remove(this);
         }
+        #endregion
 
+        #region Public Methods
         public EntityProperties GetProperties()
         {
             m_properties.Bounds = new Bounds(transform.position, new float3(2.0f * m_radius, 2.0f * m_radius, 0.0f));
             return m_properties;
-        }
-
-        public void SetMaterialProperties(MaterialPropertyBlock properties)
-        {
-            properties.SetFloat("_LightFalloff", m_falloff);
-            properties.SetColor("_LightColor", m_color);
         }
         #endregion
     }

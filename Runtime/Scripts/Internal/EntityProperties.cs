@@ -10,6 +10,8 @@ namespace Tuntenfisch.Lighting2D.Internal
         [HideInInspector]
         public Bounds Bounds;
         public Material Material;
+        [HideInInspector]
+        public Action<MaterialPropertyBlock> SetMaterialPropertiesAction;
         #endregion
     }
 }

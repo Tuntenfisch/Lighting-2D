@@ -17,7 +17,7 @@ namespace Tuntenfisch.Lighting2D.Internal
         private RendererFeature m_rendererFeature;
         private Material m_renderShadowMapMaterial;
         private MaterialPropertyBlock m_renderShadowMapMaterialProperties;
-        private MaterialPropertyBlock m_renderLightMaterialProperties;
+        private MaterialPropertyBlock m_renderEntityMaterialProperties;
         private Mesh m_shadowMapMesh;
 
         private RTHandle m_shadowCastersTextureHandle;
@@ -32,7 +32,7 @@ namespace Tuntenfisch.Lighting2D.Internal
             m_rendererFeature = renderFeature;
             m_renderShadowMapMaterial = CoreUtils.CreateEngineMaterial(m_rendererFeature.RenderShadowMapShader);
             m_renderShadowMapMaterialProperties = new MaterialPropertyBlock();
-            m_renderLightMaterialProperties = new MaterialPropertyBlock();
+            m_renderEntityMaterialProperties = new MaterialPropertyBlock();
             m_shadowMapMesh = MeshUtility.GenerateShadowMapMesh(m_rendererFeature.ShadowResolution / 2);
         }
 
@@ -109,8 +109,10 @@ namespace Tuntenfisch.Lighting2D.Internal
         private void RenderLights(ScriptableRenderContext context, ref RenderingData renderingData, CommandBuffer commandBuffer)
         {
             var camera = renderingData.cameraData.camera;
+            Debug.Assert(camera.TryGetCullingParameters(out var cullingParameters));
+            EntityManager.Cull(ref cullingParameters, camera);
 
-            foreach (var entity in EntityManager.Entities)
+            foreach (var entity in EntityManager.VisibileEntities)
             {
                 var entityProperties = entity.GetProperties();
                 var entityPosition = (float3)entityProperties.Bounds.center;
@@ -127,9 +129,9 @@ namespace Tuntenfisch.Lighting2D.Internal
                 // After the shadow map has been rendered, we render the light itself using a quad.
                 commandBuffer.SetViewProjectionMatrices(renderingData.cameraData.GetViewMatrix(), renderingData.cameraData.GetProjectionMatrix());
                 commandBuffer.SetRenderTarget(colorAttachmentHandle, depthAttachmentHandle);
-                m_renderLightMaterialProperties.Clear();
-                entity.SetMaterialProperties(m_renderLightMaterialProperties);
-                commandBuffer.DrawMesh(RenderingUtils.fullscreenMesh, localToWorldMatrix, entityProperties.Material, 0, 0, m_renderLightMaterialProperties);
+                m_renderEntityMaterialProperties.Clear();
+                entityProperties.SetMaterialPropertiesAction?.Invoke(m_renderEntityMaterialProperties);
+                commandBuffer.DrawMesh(RenderingUtils.fullscreenMesh, localToWorldMatrix, entityProperties.Material, 0, 0, m_renderEntityMaterialProperties);
                 context.ExecuteCommandBuffer(commandBuffer);
                 commandBuffer.Clear();
             }
