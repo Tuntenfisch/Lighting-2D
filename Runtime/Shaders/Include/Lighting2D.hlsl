@@ -6,7 +6,7 @@
 TEXTURE2D(_ShadowMapTexture);
 SAMPLER(sampler_ShadowMapTexture);
 
-float SampleShadowMap(float2 uv)
+float SampleShadowDistanceSquaredFromShadowMap(float2 uv)
 {
     uv = uv - 0.5f;
     int quadrant = 0;

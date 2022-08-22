@@ -27,10 +27,24 @@ Shader "Tuntenfisch/Lighting2D/RenderShadowMap"
         {
             HLSLPROGRAM
 
+            float FragmentPass(Varyings inputs) : SV_TARGET
+            {
+                return 1.0f - SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, inputs.uv).a;
+            }
+
+            ENDHLSL
+        }
+
+        Pass
+        {
+            HLSLPROGRAM
+
             float FragmentPass(Varyings inputs) : SV_Target
             {
+                float2 uv = inputs.uv - 0.5f;
+                float distanceSquared = dot(uv, uv);
                 bool shadowCaster = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, inputs.uv).r == 0.0f;
-                return shadowCaster ? length(inputs.uv - 0.5f) : 1.0f;
+                return shadowCaster ? distanceSquared : 1.0f;
             }
 
             ENDHLSL

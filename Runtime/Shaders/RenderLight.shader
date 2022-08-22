@@ -1,4 +1,4 @@
-Shader "Tuntenfisch/Lighting2D/RenderShadows"
+Shader "Tuntenfisch/Lighting2D/RenderLight"
 {
     SubShader
     {
@@ -23,6 +23,9 @@ Shader "Tuntenfisch/Lighting2D/RenderShadows"
             float2 uv : TEXCOORD0;
         };
 
+        float _LightFalloff;
+        float4 _LightColor;
+
         ENDHLSL
 
         Pass
@@ -41,11 +44,11 @@ Shader "Tuntenfisch/Lighting2D/RenderShadows"
 
             float4 FragmentPass(FragmentPassInputs inputs) : SV_Target
             {
-                float distance = length(inputs.uv - 0.5f);
-                float shadowDistance = SampleShadowMap(inputs.uv);
-                float3 shadowColor = float3(0.0f, 0.0f, 0.0f);
-                float alpha = distance > shadowDistance ? 0.1f : 0.0f;
-                return float4(shadowColor, alpha);
+                float2 uv = inputs.uv - 0.5f;
+                float distanceSquared = dot(uv, uv);
+                float shadowDistanceSquared = SampleShadowDistanceSquaredFromShadowMap(inputs.uv);
+                clip(shadowDistanceSquared - distanceSquared);
+                return (1.0f - smoothstep(_LightFalloff, 1.0f, 2.0f * sqrt(distanceSquared))) * _LightColor;
             }
 
             ENDHLSL

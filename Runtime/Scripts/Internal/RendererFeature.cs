@@ -2,17 +2,15 @@ using System;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
 
-namespace Tuntenfisch.Lighting2D
+namespace Tuntenfisch.Lighting2D.Internal
 {
     [DisallowMultipleRendererFeature("Lighting 2D")]
-    public class Lighting2DRendererFeature : ScriptableRendererFeature
+    public class RendererFeature : ScriptableRendererFeature
     {
         #region Public Properties
         public int ShadowResolution => m_shadowResolution;
         public LayerMask ShadowCasterLayer => m_shadowCasterLayer;
-        public Shader RenderShadowCastersShader => m_renderShadowCastersShader;
         public Shader RenderShadowMapShader => m_renderShadowMapShader;
-        public Shader RenderShadowsShader => m_renderShadowsShader;
         #endregion
 
         #region Inspector Fields
@@ -25,17 +23,11 @@ namespace Tuntenfisch.Lighting2D
 
         [HideInInspector]
         [SerializeField]
-        private Shader m_renderShadowCastersShader;
-        [HideInInspector]
-        [SerializeField]
         private Shader m_renderShadowMapShader;
-        [HideInInspector]
-        [SerializeField]
-        private Shader m_renderShadowsShader;
         #endregion
 
         #region Private Fields
-        private Lighting2DRenderPass m_pass;
+        private RenderPass m_pass;
         #endregion
 
         #region Unity Events
@@ -53,10 +45,8 @@ namespace Tuntenfisch.Lighting2D
         #region Public Methods
         public override void Create()
         {
-            m_renderShadowCastersShader = Shader.Find("Tuntenfisch/Lighting2D/RenderShadowCasters");
             m_renderShadowMapShader = Shader.Find("Tuntenfisch/Lighting2D/RenderShadowMap");
-            m_renderShadowsShader = Shader.Find("Tuntenfisch/Lighting2D/RenderShadows");
-            m_pass = new Lighting2DRenderPass(this);
+            m_pass = new RenderPass(this);
             m_pass.renderPassEvent = RenderPassEvent.BeforeRenderingOpaques;
         }
 
