@@ -39,20 +39,12 @@ Shader "Tuntenfisch/Lighting2D/RenderShadowMap"
         {
             HLSLPROGRAM
 
-            float FragmentPass(Varyings inputs) : SV_Target
+            float SampleShadowCasterDistance(float2 uv)
             {
-                float2 uv = inputs.uv - 0.5f;
-                float distanceSquared = dot(uv, uv);
-                bool shadowCaster = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, inputs.uv).r == 0.0f;
+                float distanceSquared = dot(uv - 0.5f, uv - 0.5f);
+                bool shadowCaster = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv).r == 0.0f;
                 return shadowCaster ? distanceSquared : 1.0f;
             }
-
-            ENDHLSL
-        }
-
-        Pass
-        {
-            HLSLPROGRAM
 
             float4 FragmentPass(Varyings inputs) : SV_TARGET
             {
@@ -61,10 +53,10 @@ Shader "Tuntenfisch/Lighting2D/RenderShadowMap"
                 float2 uv = lerp(start, end, inputs.uv.x);
 
                 float4 color;
-                color.r = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv).r;            // Map the left quadrant to the red channel.
-                color.g = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, 1.0f - uv).r;     // Map the right quadrant to the green channel.
-                color.b = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv.yx).r;         // Map the bottom quadrant to the blue channel.
-                color.a = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, 1.0f - uv.yx).r;  // Map the top quadrant to the alpha channel.
+                color.r = SampleShadowCasterDistance(uv);           // Map the left quadrant to the red channel.
+                color.g = SampleShadowCasterDistance(1.0f - uv);    // Map the right quadrant to the green channel.
+                color.b = SampleShadowCasterDistance(uv.yx);        // Map the bottom quadrant to the blue channel.
+                color.a = SampleShadowCasterDistance(1.0f - uv.yx); // Map the top quadrant to the alpha channel.
                 return color;
             }
 

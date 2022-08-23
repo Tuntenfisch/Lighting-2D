@@ -29,23 +29,35 @@ namespace Tuntenfisch.Lighting2D
         #endregion
 
         #region Unity Events
-        private void Start()
+        private void OnEnable()
         {
             m_properties.SetMaterialPropertiesAction = (materialProperties) =>
             {
                 materialProperties.SetFloat("_LightFalloff", m_falloff);
                 materialProperties.SetColor("_LightColor", m_color);
             };
-        }
 
-        private void OnEnable()
-        {
-            EntityManager.Add(this);
+            if (m_properties.Material != null)
+            {
+                EntityManager.Add(this);
+            }
         }
 
         private void OnDisable()
         {
             EntityManager.Remove(this);
+        }
+
+        private void OnValidate()
+        {
+            if (m_properties.Material != null)
+            {
+                EntityManager.Add(this);
+            }
+            else
+            {
+                EntityManager.Remove(this);
+            }
         }
         #endregion
 

@@ -21,7 +21,6 @@ namespace Tuntenfisch.Lighting2D.Internal
         private Mesh m_shadowMapMesh;
 
         private RTHandle m_shadowCastersTextureHandle;
-        private RTHandle m_shadowCasterDistancesTextureHandle;
         private RTHandle m_warpedShadowCasterDistancesTextureHandle;
         private RTHandle m_shadowMapTextureHandle;
         #endregion
@@ -51,7 +50,6 @@ namespace Tuntenfisch.Lighting2D.Internal
             CoreUtils.Destroy(m_shadowMapMesh);
 
             m_shadowCastersTextureHandle?.Release();
-            m_shadowCasterDistancesTextureHandle?.Release();
             m_warpedShadowCasterDistancesTextureHandle?.Release();
             m_shadowMapTextureHandle?.Release();
         }
@@ -63,12 +61,6 @@ namespace Tuntenfisch.Lighting2D.Internal
                 ref m_shadowCastersTextureHandle,
                 new RenderTextureDescriptor(m_rendererFeature.ShadowResolution, m_rendererFeature.ShadowResolution, RenderTextureFormat.R8),
                 name: "_ShadowCastersTexture"
-            );
-            RenderingUtils.ReAllocateIfNeeded
-            (
-                ref m_shadowCasterDistancesTextureHandle,
-                new RenderTextureDescriptor(m_rendererFeature.ShadowResolution, m_rendererFeature.ShadowResolution, RenderTextureFormat.RFloat),
-                name: "_ShadowCasterDistancesTexture"
             );
             RenderingUtils.ReAllocateIfNeeded
             (
@@ -85,7 +77,6 @@ namespace Tuntenfisch.Lighting2D.Internal
 
 #if UNITY_EDITOR
             commandBuffer.SetGlobalTexture(m_shadowCastersTextureHandle.name, m_shadowCastersTextureHandle);
-            commandBuffer.SetGlobalTexture(m_shadowCasterDistancesTextureHandle.name, m_shadowCasterDistancesTextureHandle);
             commandBuffer.SetGlobalTexture(m_warpedShadowCasterDistancesTextureHandle.name, m_warpedShadowCasterDistancesTextureHandle);
 #endif
             commandBuffer.SetGlobalTexture(m_shadowMapTextureHandle.name, m_shadowMapTextureHandle);
@@ -130,7 +121,7 @@ namespace Tuntenfisch.Lighting2D.Internal
                 commandBuffer.SetViewProjectionMatrices(renderingData.cameraData.GetViewMatrix(), renderingData.cameraData.GetProjectionMatrix());
                 commandBuffer.SetRenderTarget(colorAttachmentHandle, depthAttachmentHandle);
                 m_renderEntityMaterialProperties.Clear();
-                entityProperties.SetMaterialPropertiesAction?.Invoke(m_renderEntityMaterialProperties);
+                entityProperties.SetMaterialPropertiesAction(m_renderEntityMaterialProperties);
                 commandBuffer.DrawMesh(RenderingUtils.fullscreenMesh, localToWorldMatrix, entityProperties.Material, 0, 0, m_renderEntityMaterialProperties);
                 context.ExecuteCommandBuffer(commandBuffer);
                 commandBuffer.Clear();
@@ -156,12 +147,9 @@ namespace Tuntenfisch.Lighting2D.Internal
         private void RenderShadowMap(ScriptableRenderContext context, ref RenderingData renderingData, CommandBuffer commandBuffer)
         {
             // First, we use the previously rendered shadow caster texture to replace each pixel containing a shadow caster with the distance to the center of the texture.
-            commandBuffer.SetRenderTarget(m_shadowCasterDistancesTextureHandle, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare);
-            commandBuffer.Blit(m_shadowCastersTextureHandle, BuiltinRenderTextureType.CurrentActive, m_renderShadowMapMaterial, 1);
-
-            // Next, we warp the previously rendered shadow caster distances texture in such a way, that the shadow casters appear to be seen from the light source itself.
+            // Additionally, within the same pass, we warp that distance in such a way, that the shadow casters appear to be seen from the light source itself.
             commandBuffer.SetRenderTarget(m_warpedShadowCasterDistancesTextureHandle, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare);
-            commandBuffer.Blit(m_shadowCasterDistancesTextureHandle, BuiltinRenderTextureType.CurrentActive, m_renderShadowMapMaterial, 2);
+            commandBuffer.Blit(m_shadowCastersTextureHandle, BuiltinRenderTextureType.CurrentActive, m_renderShadowMapMaterial, 1);
 
             // Finally, we render the shadow map itself using the warped shadow caster distances texture.
             // In this last step we want to find the minimum value along each row and save that to the corresponding row of the shadow map texture.
@@ -179,7 +167,7 @@ namespace Tuntenfisch.Lighting2D.Internal
             commandBuffer.ClearRenderTarget(RTClearFlags.Color, Color.white, 1.0f, 0);
             m_renderShadowMapMaterialProperties.SetTexture("_MainTex", m_warpedShadowCasterDistancesTextureHandle);
             commandBuffer.SetViewProjectionMatrices(c_orthographicViewMatrix, c_orthographicProjectionMatrix);
-            commandBuffer.DrawMesh(m_shadowMapMesh, Matrix4x4.identity, m_renderShadowMapMaterial, 0, 3, m_renderShadowMapMaterialProperties);
+            commandBuffer.DrawMesh(m_shadowMapMesh, Matrix4x4.identity, m_renderShadowMapMaterial, 0, 2, m_renderShadowMapMaterialProperties);
         }
         #endregion
     }
