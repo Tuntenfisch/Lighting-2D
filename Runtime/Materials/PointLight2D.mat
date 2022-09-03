@@ -7,12 +7,14 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Light2D
-  m_Shader: {fileID: 4800000, guid: 67992cddb3299b64c82ff753a9fc86c9, type: 3}
+  m_Name: PointLight2D
+  m_Shader: {fileID: 4800000, guid: 011033a572094dc43a270879c1f5336e, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
-  m_InvalidKeywords: []
+  m_InvalidKeywords:
+  - LIGHTING_2D_DEPTH_SOFT_SHADOWS_ENABLED
+  - THINGY_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -41,7 +43,12 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _DepthBias: 0
+    - _EnableDepthBias: 0
     - _EnableExternalAlpha: 0
+    - _EnableSoftShadows: 0
+    - _Thingy: 1
+    - _UseDepthBias: 0
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _Flip: {r: 1, g: 1, b: 1, a: 1}

@@ -1,11 +1,13 @@
 // Based on the following links:
+//
 //     http://www.catalinzima.com/2010/07/my-technique-for-the-shader-based-dynamic-2d-shadows/
 //     https://gamedev.stackexchange.com/questions/27019/how-can-i-generate-signed-distance-fields-2d-in-real-time-fast
-Shader "Tuntenfisch/Lighting2D/RenderShadowMap"
+//
+Shader "Tuntenfisch/Lighting2D/ShadowMap"
 {
     Properties
     {
-        _MainTex ("Texture", 2D) = "white" { }
+        _MainTex ("Main Texture", 2D) = "white" { }
     }
 
     SubShader
@@ -14,6 +16,8 @@ Shader "Tuntenfisch/Lighting2D/RenderShadowMap"
 
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
         #include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Fullscreen.hlsl"
+
+        #include "Include/Common.hlsl"
 
         #pragma vertex FullscreenVert
         #pragma fragment FragmentPass
@@ -25,25 +29,24 @@ Shader "Tuntenfisch/Lighting2D/RenderShadowMap"
 
         Pass
         {
+            Blend One One
+            BlendOp Min
+
             HLSLPROGRAM
 
-            float FragmentPass(Varyings inputs) : SV_TARGET
-            {
-                return 1.0f - SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, inputs.uv).a;
-            }
-
-            ENDHLSL
-        }
-
-        Pass
-        {
-            HLSLPROGRAM
+            float _OneMinusShadowCasterAlphaThreshold;
 
             float SampleShadowCasterDistance(float2 uv)
             {
-                float distanceSquared = dot(uv - 0.5f, uv - 0.5f);
-                bool shadowCaster = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv).r == 0.0f;
-                return shadowCaster ? distanceSquared : 1.0f;
+                float distanceSquared = Lighting2D::GetDistanceSquaredToLight(uv);
+                bool shadowCaster = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv).r <= _OneMinusShadowCasterAlphaThreshold;
+
+                if (shadowCaster)
+                {
+                    return distanceSquared;
+                }
+                // If the fragment we are looking at is not a shadow caster return infinity.
+                return 1.#INF;
             }
 
             float4 FragmentPass(Varyings inputs) : SV_TARGET
@@ -58,21 +61,6 @@ Shader "Tuntenfisch/Lighting2D/RenderShadowMap"
                 color.b = SampleShadowCasterDistance(uv.yx);        // Map the bottom quadrant to the blue channel.
                 color.a = SampleShadowCasterDistance(1.0f - uv.yx); // Map the top quadrant to the alpha channel.
                 return color;
-            }
-
-            ENDHLSL
-        }
-
-        Pass
-        {
-            Blend One One
-            BlendOp Min
-
-            HLSLPROGRAM
-
-            float4 FragmentPass(Varyings inputs) : SV_TARGET
-            {
-                return SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, inputs.uv);
             }
 
             ENDHLSL

@@ -1,4 +1,10 @@
-Shader "Tuntenfisch/Lighting2D/RenderLight"
+// ToDo: Implement some sort of soft shadow support:
+//
+//     https://developer.nvidia.com/gpugems/gpugems2/part-ii-shading-lighting-and-shadows/chapter-17-efficient-soft-edged-shadows-using
+//     https://http.download.nvidia.com/developer/presentations/2005/SIGGRAPH/Percentage_Closer_Soft_Shadows.pdf
+//     https://andrew-pham.blog/2019/08/03/percentage-closer-soft-shadows/
+//
+Shader "Tuntenfisch/Lighting2D/PointLight"
 {
     SubShader
     {
@@ -6,7 +12,10 @@ Shader "Tuntenfisch/Lighting2D/RenderLight"
 
         HLSLINCLUDE
 
-        #include "Include/Lighting2D.hlsl"
+        #include "Include/Common.hlsl"
+
+        #pragma shader_feature LIGHTING_2D_DEPTH_BIAS_ENABLED
+        #pragma shader_feature LIGHTING_2D_SOFT_SHADOWS_ENABLED
 
         #pragma vertex VertexPass
         #pragma fragment FragmentPass
@@ -23,6 +32,7 @@ Shader "Tuntenfisch/Lighting2D/RenderLight"
             float2 uv : TEXCOORD0;
         };
 
+        float _DepthBias;
         float _LightFalloff;
         float4 _LightColor;
 
@@ -44,11 +54,9 @@ Shader "Tuntenfisch/Lighting2D/RenderLight"
 
             float4 FragmentPass(FragmentPassInputs inputs) : SV_Target
             {
-                float2 uv = inputs.uv - 0.5f;
-                float distanceSquared = dot(uv, uv);
-                float shadowDistanceSquared = SampleShadowDistanceSquaredFromShadowMap(inputs.uv);
-                clip(shadowDistanceSquared - distanceSquared);
-                return (1.0f - smoothstep(_LightFalloff, 1.0f, 2.0f * sqrt(distanceSquared))) * _LightColor;
+                float lightingFactor = 1.0f - Lighting2D::GetShadowingFactor(inputs.uv, _DepthBias); //
+                float falloffFactor = Lighting2D::GetLinearLightFalloffFactor(inputs.uv, _LightFalloff);
+                return lightingFactor * falloffFactor * _LightColor;
             }
 
             ENDHLSL

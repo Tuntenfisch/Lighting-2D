@@ -17,8 +17,8 @@ namespace Tuntenfisch.Lighting2D.Internal
             {
                 var even = layerIndex % 2 == 0;
 
-                vertices[vertexIndex + 0] = new float3(even ? -0.5f : 0.5f, -0.5f, 0.0f);
-                vertices[vertexIndex + 1] = new float3(even ? -0.5f : 0.5f, 0.5f, 0.0f);
+                vertices[vertexIndex + 0] = new float3(even ? -1.0f : 1.0f, -1.0f, 0.0f);
+                vertices[vertexIndex + 1] = new float3(even ? -1.0f : 1.0f, 1.0f, 0.0f);
 
                 uvs[vertexIndex + 0] = new float2(layerIndex / (float)numberOfOverlayedQuads, 0.0f);
                 uvs[vertexIndex + 1] = new float2(layerIndex / (float)numberOfOverlayedQuads, 1.0f);

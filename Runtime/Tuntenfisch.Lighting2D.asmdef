@@ -2,13 +2,14 @@
     "name": "tuntenfisch.lighting-2d",
     "rootNamespace": "Tuntenfisch.Lighting2D",
     "references": [
+        "GUID:e0cd26848372d4e5c891c569017e11f1",
         "GUID:d8b63aba1907145bea998dd612889d6b",
         "GUID:df380645f10b7bc4b97d4f5eb6303d95",
         "GUID:15fc0a57446b3144c949da3e2b9737a9"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
-    "allowUnsafeCode": false,
+    "allowUnsafeCode": true,
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,

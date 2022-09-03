@@ -3,17 +3,18 @@ using UnityEngine;
 
 namespace Tuntenfisch.Lighting2D.Editor
 {
-    [CustomEditor(typeof(Light2D))]
-    public class Light2DEditor : UnityEditor.Editor
+    [CanEditMultipleObjects]
+    [CustomEditor(typeof(PointLight))]
+    public class PointLightEditor : UnityEditor.Editor
     {
         #region Private Fields
-        private Light2D m_light;
+        private PointLight m_light;
         #endregion
 
         #region Unity Events
         private void OnEnable()
         {
-            m_light = target as Light2D;
+            m_light = target as PointLight;
         }
 
         private void OnSceneGUI()
