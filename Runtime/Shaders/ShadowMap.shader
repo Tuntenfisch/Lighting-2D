@@ -14,9 +14,7 @@ Shader "Tuntenfisch/Lighting2D/ShadowMap"
     {
         HLSLINCLUDE
 
-        #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
         #include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Fullscreen.hlsl"
-
         #include "Include/Common.hlsl"
 
         #pragma vertex FullscreenVert
@@ -34,19 +32,21 @@ Shader "Tuntenfisch/Lighting2D/ShadowMap"
 
             HLSLPROGRAM
 
+            float _ShadowDepthBias;
             float _OneMinusShadowCasterAlphaThreshold;
 
             float SampleShadowCasterDistance(float2 uv)
             {
-                float distanceSquared = Lighting2D::GetDistanceSquaredToLight(uv);
+                float2 positionLS = Lighting2D::GetPositionLightSpace(uv); //
+                float distance = Lighting2D::GetDistanceToLight(positionLS); //
                 bool shadowCaster = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv).r <= _OneMinusShadowCasterAlphaThreshold;
 
                 if (shadowCaster)
                 {
-                    return distanceSquared;
+                    return distance + _ShadowDepthBias;
                 }
                 // If the fragment we are looking at is not a shadow caster return infinity.
-                return 1.#INF;
+                return Math::infinity;
             }
 
             float4 FragmentPass(Varyings inputs) : SV_TARGET

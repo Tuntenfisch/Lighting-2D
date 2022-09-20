@@ -1,122 +1,160 @@
+using System;
+using System.Collections;
 using System.Collections.Generic;
+using Tuntenfisch.Lighting2D.Common;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
-using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 
 namespace Tuntenfisch.Lighting2D.Internal
 {
-    public static class LightManager
+    public sealed class LightManager : IDisposable
     {
         #region Public Properties
-        public static IEnumerable<ILight> VisibleLights
-        {
-            get
-            {
-                foreach (var visibleLightIndex in s_visibleLightIndices)
-                {
-                    yield return s_lights[visibleLightIndex];
-                }
-            }
-        }
+        internal VisibleLightsEnumerator VisibleLights => new VisibleLightsEnumerator(this);
         #endregion
 
         #region Private Fields
-        private static List<ILight> s_lights = new List<ILight>();
-        private static NativeList<Plane> s_cullingPlanes = new NativeList<Plane>(6, Allocator.Persistent);
-        private static NativeList<Bounds> s_lightBounds = new NativeList<Bounds>(Allocator.Persistent);
-        private static NativeList<int> s_visibleLightIndices = new NativeList<int>(100, Allocator.Persistent);
+        private static IndexableLinkedList<ILight> s_lights;
+
+        private NativeList<int> m_lightIDs;
+        private NativeList<Bounds> m_lightBounds;
+        private NativeList<int> m_visibleLightIDs;
         #endregion
 
         #region Public Methods
-        public static void Add(ILight light)
+        public void Dispose()
         {
-            if (s_lights.Contains(light))
+            try
             {
-                return;
+                m_lightIDs.Dispose();
+                m_lightBounds.Dispose();
+                m_visibleLightIDs.Dispose();
             }
-            s_lights.Add(light);
+            catch { }
+        }
+        #endregion
+
+        #region Public Methods
+        static LightManager()
+        {
+            s_lights = new IndexableLinkedList<ILight>();
         }
 
-        public static void Remove(ILight light)
+        public static int Add(ILight light)
         {
-            if (!s_lights.Contains(light))
-            {
-                return;
-            }
-            s_lights.Remove(light);
+            return s_lights.Insert(light);
+        }
+
+        public static void Remove(int lightID)
+        {
+            s_lights.Erase(lightID);
         }
         #endregion
 
         #region Internal Methods
-        internal static void Cull(ref ScriptableCullingParameters cullingParameters)
+        internal LightManager()
         {
-            Profiler.BeginSample($"{nameof(LightManager)}.{nameof(Cull)}");
-            UpdateCullingPlanes(ref cullingParameters);
-            UpdateLightBounds();
-            UpdateVisibleLightIndices();
-            Profiler.EndSample();
+            m_lightIDs = new NativeList<int>(Allocator.Persistent);
+            m_lightBounds = new NativeList<Bounds>(Allocator.Persistent);
+            m_visibleLightIDs = new NativeList<int>(Allocator.Persistent);
         }
 
-        internal static void Dispose()
+        internal JobHandle Cull(ref ScriptableCullingParameters cullingParameters, JobHandle dependency = default)
         {
-            s_cullingPlanes.Dispose();
-            s_lightBounds.Dispose();
-            s_visibleLightIndices.Dispose();
+            SetupLightCullingJob();
+            return DispatchLightCullingJob(ref cullingParameters, dependency);
         }
         #endregion
 
         #region Private Methods
-        private static void UpdateCullingPlanes(ref ScriptableCullingParameters cullingParameters)
+        private void SetupLightCullingJob()
         {
-            s_cullingPlanes.Clear();
+            m_lightIDs.Clear();
+            m_lightBounds.Clear();
 
-            for (int index = 0; index < cullingParameters.cullingPlaneCount; index++)
+            foreach (var (lightID, light) in s_lights.GetEnumeratorNonAlloc())
             {
-                s_cullingPlanes.Add(cullingParameters.GetCullingPlane(index));
+                m_lightIDs.Add(lightID);
+                m_lightBounds.Add(light.GetLightProperties(update: true).Bounds);
             }
+            m_visibleLightIDs.Clear();
+            m_visibleLightIDs.EnsureMinimumCapacity(s_lights.Count);
         }
 
-        private static void UpdateLightBounds()
+        private JobHandle DispatchLightCullingJob(ref ScriptableCullingParameters cullingParameters, JobHandle dependency = default)
         {
-            s_lightBounds.Clear();
-
-            foreach (var light in s_lights)
+            return new LightCullingJob
             {
-                s_lightBounds.Add(light.GetLightProperties(update: true).Bounds);
-            }
+                CullingParameters = cullingParameters,
+                LightIDs = m_lightIDs,
+                LightBounds = m_lightBounds,
+                VisibleLightIDs = m_visibleLightIDs.AsParallelWriter()
+            }.Schedule(m_lightBounds.Length, 4, dependency);
         }
+        #endregion
 
-        private static void UpdateVisibleLightIndices()
+        #region Public Classes, Enums and Structs
+        public struct VisibleLightsEnumerator : IEnumerator<ILight>
         {
-            s_visibleLightIndices.Clear();
+            #region Public Properties
+            public ILight Current => LightManager.s_lights[m_parent.m_visibleLightIDs[m_index]];
+            object IEnumerator.Current => Current;
+            #endregion
 
-            if (s_lights.Count > s_visibleLightIndices.Capacity)
+            #region Private Fields
+            private const int c_resetIndex = -1;
+
+            private LightManager m_parent;
+            private int m_index;
+            #endregion
+
+            #region Public Methods
+            public VisibleLightsEnumerator(LightManager parent)
             {
-                s_visibleLightIndices.SetCapacity(2 * s_lightBounds.Length);
+                m_parent = parent;
+                m_index = c_resetIndex;
             }
 
-            new LightCullJob
+            public void Dispose()
             {
-                CullingPlanes = s_cullingPlanes,
-                LightBounds = s_lightBounds,
-                VisibleLightIndices = s_visibleLightIndices.AsParallelWriter()
-            }.Run(s_lightBounds.Length);
+                m_parent = null;
+            }
+
+            public bool MoveNext()
+            {
+                m_index++;
+                return m_index < m_parent.m_visibleLightIDs.Length;
+            }
+
+            public void Reset()
+            {
+                m_index = c_resetIndex;
+            }
+
+            public VisibleLightsEnumerator GetEnumerator()
+            {
+                return this;
+            }
+            #endregion
         }
         #endregion
 
         #region Private Classes, Enums and Structs
-        private struct LightCullJob : IJobParallelFor
+        [BurstCompile]
+        private struct LightCullingJob : IJobParallelFor
         {
             #region Public Fields
+            public ScriptableCullingParameters CullingParameters;
             [ReadOnly]
-            public NativeList<Plane> CullingPlanes;
+            public NativeList<int> LightIDs;
             [ReadOnly]
             public NativeList<Bounds> LightBounds;
             [WriteOnly]
-            public NativeList<int>.ParallelWriter VisibleLightIndices;
+            public NativeList<int>.ParallelWriter VisibleLightIDs;
             #endregion
 
             #region Public Methods
@@ -124,7 +162,7 @@ namespace Tuntenfisch.Lighting2D.Internal
             {
                 if (AreBoundsVisible(LightBounds[index]))
                 {
-                    VisibleLightIndices.AddNoResize(index);
+                    VisibleLightIDs.AddNoResize(LightIDs[index]);
                 }
             }
             #endregion
@@ -134,8 +172,9 @@ namespace Tuntenfisch.Lighting2D.Internal
             // https://forum.unity.com/threads/managed-version-of-geometryutility-testplanesaabb.473575/.
             private bool AreBoundsVisible(Bounds bounds)
             {
-                foreach (var cullingPlane in CullingPlanes)
+                for (int index = 0; index < CullingParameters.cullingPlaneCount; index++)
                 {
+                    var cullingPlane = CullingParameters.GetCullingPlane(index);
                     var sign = math.sign(cullingPlane.normal);
                     var point = (float3)bounds.center + sign * bounds.extents;
 

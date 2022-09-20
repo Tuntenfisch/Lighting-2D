@@ -4,10 +4,10 @@ using UnityEngine.Rendering;
 
 namespace Tuntenfisch.Lighting2D.Internal
 {
-    public static class MeshUtility
+    internal static class ShadowMapMesh
     {
-        #region Public Methods
-        public static Mesh GenerateShadowMapMesh(int numberOfOverlayedQuads)
+        #region Internal Methods
+        internal static Mesh Generate(int numberOfOverlayedQuads)
         {
             var vertices = new Vector3[2 * numberOfOverlayedQuads + 2];
             var uvs = new Vector2[vertices.Length];

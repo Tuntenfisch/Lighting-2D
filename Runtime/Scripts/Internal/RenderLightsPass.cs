@@ -1,21 +1,23 @@
 using System;
-using Unity.Jobs;
+using Tuntenfisch.Lighting2D.Common;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.RendererUtils;
 using UnityEngine.Rendering.Universal;
 
 namespace Tuntenfisch.Lighting2D.Internal
 {
-    public class RenderPass : ScriptableRenderPass, IDisposable
+    internal sealed class RenderLightsPass : ScriptableRenderPass, IDisposable
     {
         #region Private Fields
         private readonly ShaderTagId[] c_shaderTags = new ShaderTagId[] { new ShaderTagId("UniversalForward") };
+        private readonly Plane[] c_cullingPlanes = new Plane[6];
         private readonly Color c_shadowMapClearColor = new Color(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
         private readonly Matrix4x4 c_orthographicViewMatrix = Matrix4x4.TRS(new float3(0.0f, 0.0f, -1.0f), Quaternion.identity, new float3(1.0f, 1.0f, -1.0f));
         private readonly Matrix4x4 c_orthographicProjectionMatrix = Matrix4x4.Ortho(-1.0f, 1.0f, -1.0f, 1.0f, 0.3f, 1000.0f);
 
-        private RendererFeature m_rendererFeature;
+        private Lighting2D m_rendererFeature;
 
         // -----------------------------------------------------------------------------------------------------------------------------
         // Fields related to shadow map generation.
@@ -33,25 +35,64 @@ namespace Tuntenfisch.Lighting2D.Internal
         #endregion
 
         #region Public Methods
-        public RenderPass(RendererFeature renderFeature)
+        public override void OnCameraSetup(CommandBuffer commandBuffer, ref RenderingData renderingData)
+        {
+#if UNITY_EDITOR
+            commandBuffer.SetGlobalTexture(m_shadowCastersTextureHandle.name, m_shadowCastersTextureHandle);
+#endif
+            commandBuffer.SetGlobalTexture(m_shadowMapTextureHandle.name, m_shadowMapTextureHandle);
+            ConfigureTarget(renderingData.cameraData.renderer.cameraColorTargetHandle, renderingData.cameraData.renderer.cameraDepthTargetHandle);
+        }
+
+        public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
+        {
+            var commandBuffer = CommandBufferPool.Get();
+
+            using (new ProfilingScope(commandBuffer, profilingSampler))
+            {
+                RenderLights(ref context, ref renderingData, commandBuffer);
+            }
+            CommandBufferPool.Release(commandBuffer);
+        }
+
+        public void Dispose()
+        {
+            CoreUtils.Destroy(m_shadowCasterMaterial);
+            m_shadowCasterMaterial = null;
+            CoreUtils.Destroy(m_shadowMapMaterial);
+            m_shadowMapMaterial = null;
+            CoreUtils.Destroy(m_shadowMapMesh);
+            m_shadowMapMesh = null;
+
+            m_shadowCastersTextureHandle?.Release();
+            m_shadowCastersTextureHandle = null;
+            m_shadowMapTextureHandle?.Release();
+            m_shadowMapTextureHandle = null;
+        }
+        #endregion
+
+        #region Internal Methods
+        internal RenderLightsPass(Lighting2D renderFeature)
         {
             m_rendererFeature = renderFeature;
             m_shadowCasterMaterial = CoreUtils.CreateEngineMaterial(m_rendererFeature.ShadowCasterShader);
             m_shadowMapMaterial = CoreUtils.CreateEngineMaterial(m_rendererFeature.ShadowMapShader);
             m_shadowMapMaterialProperties = new MaterialPropertyBlock();
+
             // Initialize the remaining fields.
             OnValidate();
         }
 
-        public void OnValidate()
+        internal void OnValidate()
         {
+            m_shadowMapMaterial.SetFloat(ShaderInfo.ShadowDepthBiasID, m_rendererFeature.ShadowDepthBias);
             m_shadowMapMaterial.SetFloat(ShaderInfo.OneMinusShadowCasterAlphaThresholdID, 1.0f - m_rendererFeature.ShadowCasterAlphaThreshold);
 
             if (m_shadowMapMesh != null)
             {
                 CoreUtils.Destroy(m_shadowMapMesh);
             }
-            m_shadowMapMesh = MeshUtility.GenerateShadowMapMesh(m_rendererFeature.ShadowMapResolution / 2);
+            m_shadowMapMesh = ShadowMapMesh.Generate(m_rendererFeature.ShadowMapResolution / 2);
 
             RenderingUtils.ReAllocateIfNeeded
             (
@@ -77,46 +118,15 @@ namespace Tuntenfisch.Lighting2D.Internal
                 name: ShaderInfo.ShadowMapTextureName
             );
         }
-
-        public void Dispose()
-        {
-            CoreUtils.Destroy(m_shadowCasterMaterial);
-            CoreUtils.Destroy(m_shadowMapMaterial);
-            CoreUtils.Destroy(m_shadowMapMesh);
-
-            m_shadowCastersTextureHandle?.Release();
-            m_shadowMapTextureHandle?.Release();
-        }
-
-        public override void OnCameraSetup(CommandBuffer commandBuffer, ref RenderingData renderingData)
-        {
-#if UNITY_EDITOR
-            commandBuffer.SetGlobalTexture(m_shadowCastersTextureHandle.name, m_shadowCastersTextureHandle);
-#endif
-            commandBuffer.SetGlobalTexture(m_shadowMapTextureHandle.name, m_shadowMapTextureHandle);
-            ConfigureTarget(renderingData.cameraData.renderer.cameraColorTargetHandle, renderingData.cameraData.renderer.cameraDepthTargetHandle);
-        }
-
-        public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
-        {
-            var commandBuffer = CommandBufferPool.Get();
-
-            using (new ProfilingScope(commandBuffer, profilingSampler))
-            {
-                RenderLights(ref context, ref renderingData, commandBuffer);
-            }
-            CommandBufferPool.Release(commandBuffer);
-        }
         #endregion
 
         #region Private Methods
         private void RenderLights(ref ScriptableRenderContext context, ref RenderingData renderingData, CommandBuffer commandBuffer)
         {
             var camera = renderingData.cameraData.camera;
-            Debug.Assert(camera.TryGetCullingParameters(out var cullingParameters));
-            LightManager.Cull(ref cullingParameters);
+            m_rendererFeature.CullLightsPass.EnsureCompletion();
 
-            foreach (var light in LightManager.VisibleLights)
+            foreach (var light in m_rendererFeature.LightManager.VisibleLights)
             {
                 var lightProperties = light.GetLightProperties();
                 var lightPosition = (float3)lightProperties.Bounds.center;
@@ -143,17 +153,27 @@ namespace Tuntenfisch.Lighting2D.Internal
             commandBuffer.SetRenderTarget(m_shadowCastersTextureHandle, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare);
             commandBuffer.ClearRenderTarget(RTClearFlags.Color, Color.white, 1.0f, 0);
 
-            ShadowCasterManager.Cull(ref lightProperties);
-
-            foreach (var shadowCaster in ShadowCasterManager.VisibleShadowCasters)
+            // Based on https://forum.unity.com/threads/can-i-use-scriptablerendercontext-cull-to-get-another-culling-results-in-scriptablerenderpass.1075930/.
+            if (renderingData.cameraData.camera.TryGetCullingParameters(out var cullingParameters))
             {
-                commandBuffer.DrawRenderer(shadowCaster.Renderer, m_shadowCasterMaterial, 0, 0);
-            }
-        }
+                cullingParameters.cullingMatrix = projectionMatrix * viewMatrix;
+                GeometryUtility.CalculateFrustumPlanes(cullingParameters.cullingMatrix, c_cullingPlanes);
 
-        private unsafe JobHandle OnPerformCulling(BatchRendererGroup rendererGroup, BatchCullingContext cullingContext, BatchCullingOutput cullingOutput, IntPtr userContext)
-        {
-            return default;
+                for (int index = 0; index < c_cullingPlanes.Length; index++)
+                {
+                    cullingParameters.SetCullingPlane(index, c_cullingPlanes[index]);
+                }
+                var cullResults = context.Cull(ref cullingParameters);
+                var shadowCasters = context.CreateRendererList(new RendererListDesc(c_shaderTags, cullResults, renderingData.cameraData.camera)
+                {
+                    renderQueueRange = RenderQueueRange.all,
+                    sortingCriteria = SortingCriteria.None,
+                    overrideMaterial = m_shadowCasterMaterial,
+                    overrideMaterialPassIndex = 0,
+                    renderingLayerMask = Lighting2D.ShadowCasterRenderingLayer
+                });
+                commandBuffer.DrawRendererList(shadowCasters);
+            }
         }
 
         private void RenderShadowMap(ref LightProperties lightProperties, ref RenderingData renderingData, CommandBuffer commandBuffer)
@@ -165,7 +185,7 @@ namespace Tuntenfisch.Lighting2D.Internal
             //     Additionally, within the same pass, we warp the distances in such a way, that the shadow casters appear to be seen from the light source itself.
             //     Now each light ray the light is sending out will be mapped to one row along our texture. A visually representation can be found here:
             //
-            //     http://www.catalinzima.com/2010/07/my-technique-for-the-shader-based-dynamic-2d-shadows/
+            //         http://www.catalinzima.com/2010/07/my-technique-for-the-shader-based-dynamic-2d-shadows/
             //
             //     Finally, to obtain the actual shadow map, we want to find the minimum distance to a shadow caster along each light ray and save that to the corresponding
             //     row of the shadow map texture. It effectively boils down to performing a row-wise min-reduction of the warped shadow caster distances texture.
@@ -179,8 +199,8 @@ namespace Tuntenfisch.Lighting2D.Internal
             //     which effectively performs the aforementioned row-wise min-reduction. It's basically a blit operation that is using our special
             //     custom mesh instead of a fullscreen quad.
             //
-            m_shadowMapMaterialProperties.SetTexture("_MainTex", m_shadowCastersTextureHandle);
-            m_shadowMapMaterialProperties.SetVector(ShaderInfo.LightIlluminationSizeID, new float4(2.0f * lightProperties.Extents, 0.0f, 0.0f));
+            m_shadowMapMaterialProperties.SetTexture(ShaderInfo.MainTextureID, m_shadowCastersTextureHandle);
+            m_shadowMapMaterialProperties.SetVector(ShaderInfo.LightIlluminationSizeID, new float4(1.0f / (2.0f * lightProperties.Extents), 2.0f * lightProperties.Extents));
             commandBuffer.SetRenderTarget(m_shadowMapTextureHandle, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare);
             commandBuffer.ClearRenderTarget(RTClearFlags.Color, c_shadowMapClearColor, 1.0f, 0);
             commandBuffer.SetViewProjectionMatrices(c_orthographicViewMatrix, c_orthographicProjectionMatrix);
@@ -189,7 +209,7 @@ namespace Tuntenfisch.Lighting2D.Internal
 
         private void RenderLight(ref LightProperties lightProperties, ref Matrix4x4 localToWorldMatrix, ref RenderingData renderingData, CommandBuffer commandBuffer)
         {
-            lightProperties.MaterialPropertyBlock.SetVector(ShaderInfo.LightIlluminationSizeID, new float4(2.0f * lightProperties.Extents, 0.0f, 0.0f));
+            lightProperties.MaterialPropertyBlock.SetVector(ShaderInfo.LightIlluminationSizeID, new float4(1.0f / (2.0f * lightProperties.Extents), 2.0f * lightProperties.Extents));
             commandBuffer.SetViewProjectionMatrices(renderingData.cameraData.GetViewMatrix(), renderingData.cameraData.GetProjectionMatrix());
             commandBuffer.SetRenderTarget(colorAttachmentHandle, depthAttachmentHandle);
             commandBuffer.DrawMesh(RenderingUtils.fullscreenMesh, localToWorldMatrix, lightProperties.Material, 0, 0, lightProperties.MaterialPropertyBlock);

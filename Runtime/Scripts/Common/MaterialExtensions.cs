@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Tuntenfisch.Lighting2D
+namespace Tuntenfisch.Lighting2D.Common
 {
     public static class MaterialExtensions
     {

@@ -1,31 +1,31 @@
 using UnityEngine;
 
-namespace Tuntenfisch.Lighting2D
+namespace Tuntenfisch.Lighting2D.Internal
 {
     public static class ShaderInfo
     {
         #region Public Fields
         // -----------------------------------------------------------------------------------------------------------------------------
-        // Keywords
+        // Shader Keywords
         // -----------------------------------------------------------------------------------------------------------------------------
-        public const string DepthBiasEnabledKeyword = "LIGHTING_2D_DEPTH_BIAS_ENABLED";
         public const string SoftShadowsEnabledKeyword = "LIGHTING_2D_SOFT_SHADOWS_ENABLED";
 
         // -----------------------------------------------------------------------------------------------------------------------------
-        // Shaders
+        // Shader Names
         // -----------------------------------------------------------------------------------------------------------------------------#
         public const string ShadowCasterShaderName = "Tuntenfisch/Lighting2D/ShadowCaster";
         public const string ShadowMapShaderName = "Tuntenfisch/Lighting2D/ShadowMap";
-        public const string PointLightShaderName = "Tuntenfisch/Lighting2D/PointLight";
 
         // -----------------------------------------------------------------------------------------------------------------------------
-        // Properties
+        // Shader Properties
         // -----------------------------------------------------------------------------------------------------------------------------
-        public static readonly int LightIlluminationSizeID = Shader.PropertyToID("_LightIlluminationSize");
+        public static readonly int MainTextureID = Shader.PropertyToID("_MainTex");
+        public static readonly int ShadowDepthBiasID = Shader.PropertyToID("_ShadowDepthBias");
         public static readonly int OneMinusShadowCasterAlphaThresholdID = Shader.PropertyToID("_OneMinusShadowCasterAlphaThreshold");
+        public static readonly int LightIlluminationSizeID = Shader.PropertyToID("_LightIlluminationSize");
 
         // -----------------------------------------------------------------------------------------------------------------------------
-        // Textures
+        // Textures Names
         // -----------------------------------------------------------------------------------------------------------------------------
         public const string ShadowCastersTextureName = "_ShadowCastersTexture";
         public const string ShadowMapTextureName = "_ShadowMapTexture";

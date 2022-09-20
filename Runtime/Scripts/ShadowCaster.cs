@@ -1,45 +1,41 @@
-using Tuntenfisch.Lighting2D.Internal;
 using UnityEngine;
 
 namespace Tuntenfisch.Lighting2D
 {
     [ExecuteAlways]
-    [RequireComponent(typeof(SpriteRenderer))]
-    public class ShadowCaster : MonoBehaviour
+    [RequireComponent(typeof(Renderer))]
+    public sealed class ShadowCaster : MonoBehaviour
     {
-        #region Public Properties
-        public SpriteRenderer Renderer => m_renderer;
-        #endregion
-
         #region Private Fields
-        private SpriteRenderer m_renderer;
+        private Renderer m_renderer;
+        private uint m_renderingLayer;
         #endregion
 
         #region Unity Events
-        private void OnValidate()
-        {
-            Initialize();
-        }
-
         private void OnEnable()
         {
-            Initialize();
-            ShadowCasterManager.Add(this);
+            if (m_renderer == null)
+            {
+                m_renderer = GetComponent<Renderer>();
+            }
+            m_renderingLayer = Internal.Lighting2D.ShadowCasterRenderingLayer;
+            m_renderer.renderingLayerMask |= m_renderingLayer;
+            Internal.Lighting2D.OnShadowCasterRenderingLayerChanged += UpdateRenderingLayer;
         }
 
         private void OnDisable()
         {
-            ShadowCasterManager.Remove(this);
+            m_renderer.renderingLayerMask &= ~m_renderingLayer;
+            Internal.Lighting2D.OnShadowCasterRenderingLayerChanged -= UpdateRenderingLayer;
         }
         #endregion
 
         #region Private Methods
-        private void Initialize()
+        private void UpdateRenderingLayer()
         {
-            if (m_renderer == null)
-            {
-                m_renderer = GetComponent<SpriteRenderer>();
-            }
+            m_renderer.renderingLayerMask &= ~m_renderingLayer;
+            m_renderingLayer = Internal.Lighting2D.ShadowCasterRenderingLayer;
+            m_renderer.renderingLayerMask |= m_renderingLayer;
         }
         #endregion
     }

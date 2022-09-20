@@ -1,9 +1,12 @@
 {
   "name": "com.tuntenfisch.lighting-2d",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "displayName": "Lighting 2D",
   "description": "2D lighting framework for URP featuring pixel-perfect shadows.",
   "unity": "2022.1",
+  "dependencies": {
+    "com.unity.collections": "1.2.4"
+  },
   "author": {
     "name": "Tuntenfisch",
     "url": "https://github.com/Tuntenfisch/"
